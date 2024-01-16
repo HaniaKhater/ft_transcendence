@@ -1,0 +1,54 @@
+services:
+  postgresql:
+    container_name: postgresql
+    build:  ./postgresql
+    env_file: .env
+    volumes:
+      - db-data:/var/lib/postgresql/15/main
+    networks:
+      - network
+
+  app:
+    container_name: app
+    build: ./app
+    depends_on:
+      - postgresql
+    env_file: .env
+    volumes:
+      - type: volume
+        source: tuto-data
+        target: /tuto
+      - type: volume
+        source: src-data
+        target: /src
+    networks:
+      - network
+    ports:
+      - "8000:8000"
+      - "8001:443"
+      - "8080:8080"
+
+networks:
+  network:
+    name: ${NETWORK_NAME}
+    driver: bridge
+
+volumes:
+  db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data
+  src-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./app/src/
+  tuto-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./app/tuto/
