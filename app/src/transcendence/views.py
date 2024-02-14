@@ -1,11 +1,15 @@
+import asyncio
+import html
 import json
 import os
 from typing import Any
 from datetime import timezone, timedelta
+import sys
 
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.core.paginator import Paginator
+from django.db.models import F, Q
 from django.db.models.query import QuerySet
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
@@ -14,14 +18,14 @@ from django.contrib.auth import login, authenticate
 from django.contrib.auth.decorators import login_required
 from django.utils.translation import gettext as _
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, StreamingHttpResponse
 from django.utils import translation, timezone
 from django.utils.translation import check_for_language
-from django.views.generic.list import ListView
 
 from .forms import CustomUserCreationForm, CustomUserChangeForm, CustomProfileChangeForm
-from .models import Profile, SESSION_TIMEOUT_SECONDS
+from .models import Profile, PongGame, SESSION_TIMEOUT_SECONDS
 from .pong.local_tournament import lobby
+from .pong.online_game.online_game import online_game_stream
 # Create your views here.
 
 def index(request):
@@ -45,14 +49,9 @@ def local_tournament_form(request):
 
 def local_tournament_lobby(request):
     if ( request.method == "POST" ):
-        tournament_state = json.loads( request.body )
+        escaped_body = html.escape( request.body.decode(), quote=False )
+        tournament_state = json.loads( escaped_body )
         context = lobby.build_local_tournament_context( tournament_state )
-        # TODO: this is debug
-        # with open("/dev/pts/0", "w") as f:
-        #     print("processing form", file=f)
-        #     print(f"{tournament_state = }", file=f)
-        # return render(request, "transcendence/pong/local_tournament/lobby.html")
-        # return HttpResponse(request.body)
         return render(request, "transcendence/pong/local_tournament/lobby.html", context)
     else:
         return redirect("local-tournament-form")
@@ -75,7 +74,6 @@ def local_tournament_results(request):
     else:
         return redirect("local-tournament-form")
 
-# TODO: redirect to profile page if user is authenticated
 def signup(request):
     if ( request.method == "POST" ):
         form = CustomUserCreationForm( request.POST )
@@ -135,6 +133,7 @@ def leaderboard(request):
                     "transcendence/community/leaderboard.html",
                     {
                         "page_obj": page_obj,
+                        "start_index": ( int(page_number if page_number else 1) - 1 ) * 3,
                     })
 
 @login_required
@@ -148,7 +147,15 @@ def user_details(request, id):
             client_profile.following.add( User.objects.get(pk=id) )
     own_page = request.user.pk == id
     following = client_profile.following.filter(id=id).exists()
-    context = {"profile": target_profile, "own_page":own_page, "following": following}
+
+    # stats and history
+    game_history = PongGame.objects.filter(Q(user_1_id=target_profile.user_id) | Q(user_2_id=target_profile.user_id),
+                                           Q(winner__isnull=False) ).order_by("-start_time")
+    nb_wins = game_history.filter(winner_id=target_profile.user_id).count()
+    nb_losses = game_history.filter(~Q(winner_id=target_profile.user_id)).count()
+
+    context = {"target_profile": target_profile, "own_page":own_page, "following": following,
+               "nb_wins":nb_wins, "nb_losses":nb_losses, "game_history":game_history, }
     return render( request, "transcendence/community/user_details.html", context )
 
 
@@ -170,3 +177,11 @@ def following(request):
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     return render( request, "transcendence/community/following.html", {"page_obj":page_obj} )
+
+@login_required
+def online_game(request):
+    return render( request, "transcendence/pong/online_game/online_game.html" )
+
+@login_required
+def online_tournament(request):
+    return render( request, "transcendence/pong/online_tournament/online_tournament.html" )

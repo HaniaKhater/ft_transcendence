@@ -35,6 +35,8 @@ let pong_game = {
     max_bounce_angle: 5 * Math.PI / 12, // if mean height of ball >= left_paddle.top
     // Game state
     game_in_progress: false,
+    opponnent_is_ai: false,
+    ai_type: null,
     left_score: 0,
     right_score: 0,
     last_scorer: null, // 'null' until first point, then 'left' or 'right'
@@ -43,7 +45,7 @@ let pong_game = {
     end_of_game_callback: null,
 }
 
-function init_pong_game_htmlelements()
+function init_pong_game_htmlelements( ai_type = null )
 {
 
     with ( pong_game )
@@ -55,6 +57,11 @@ function init_pong_game_htmlelements()
         html_element_ball = document.getElementById(`ball`);
         html_element_left_score = document.getElementById(`left-score`);
         html_element_right_score = document.getElementById(`right-score`);
+    }
+    if ( ai_type )
+    {
+        pong_game.opponnent_is_ai = true;
+        pong_game.ai_type = ai_type;
     }
 }
 

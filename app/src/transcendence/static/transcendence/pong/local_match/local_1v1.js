@@ -9,7 +9,7 @@ function remove_main_local_1v1_listeners( main )
     window.removeEventListener( "keyup", handle_keyup);
 }
 
-function update_main_local_1v1( main )
+function update_main_local_1v1( ai_type )
 {
     /**
      * Initialize game
@@ -17,7 +17,7 @@ function update_main_local_1v1( main )
      * 
      */
     // pong_game.html_element_game_canvas.style.borderWidth = `${pong_game.game_canvas_border_width_px}px`;
-    init_pong_game_htmlelements( "local-1v1" );
+    init_pong_game_htmlelements( ai_type );
     pong_game.html_element_start_button.addEventListener( "click", start_local_pvp_game );
     pong_game.html_element_start_button.classList.replace( "hidden", "shown" );
 }
@@ -42,6 +42,15 @@ function start_local_pvp_game( event )
     pong_game.html_element_start_button.classList.replace( "shown", "hidden" );
     // call the animation function that will call requestAnimationFrame()
     pong_game.game_in_progress = true;
+    if ( pong_game.ai_type == "old" )
+        intervalID = setInterval(fetchBallYCoordinate, 1000);
+    if ( pong_game.ai_type == "new" )
+    {
+        new_ai_update_state();
+        new_ai_interval_update_state = setInterval( new_ai_update_state, 1000 );
+        new_ai_interval_move = setInterval( new_ai_move, 50 );
+        // new_ai_interval_debug = setInterval( new_ai_debug, 50 );
+    }
     requestAnimationFrame( time => animate(time, time) );
 }
 
@@ -51,11 +60,18 @@ function animate( time, last_time )
     update_ball_position( time - last_time );
     if ( check_score() )
     {
+        if (pong_game.ai_type == "new")
+        {
+            ai_state.state = "idle";
+            ai_move("stop");
+        }
         if ( new_point() )
         {
             pong_game.end_of_game_callback();
             return;
         }
+        if ( pong_game.ai_type == "new")
+            new_ai_update_state();
     }
     else
     {
@@ -69,7 +85,15 @@ function animate( time, last_time )
 function end_local_pvp_game()
 {
     pong_game.game_in_progress = false;
-    update_main_local_1v1();
+    if ( pong_game.ai_type == "old" )
+        clearInterval(intervalID);
+    if ( pong_game.ai_type == "new" )
+    {
+        clearInterval( new_ai_interval_update_state );
+        clearInterval( new_ai_interval_debug );
+        clearInterval( new_ai_interval_move );
+    }
+    update_main_local_1v1( ai_type = pong_game.ai_type );
 }
 
 function clamp( num, min, max )
@@ -125,9 +149,10 @@ function init_game_state()
 
 function handle_keydown( event )
 {
-    if ( event.key == "e")
+    let key = event.key.toLowerCase();
+    if ( key == "e" && !pong_game.opponnent_is_ai )
         pong_game.left_paddle_up = true;
-    else if ( event.key == "d" )
+    else if ( key == "d" && !pong_game.opponnent_is_ai )
         pong_game.left_paddle_down = true;
     else if ( event.key == "ArrowUp" )
         pong_game.right_paddle_up = true;
@@ -137,9 +162,10 @@ function handle_keydown( event )
 
 function handle_keyup( event )
 {
-    if ( event.key == "e")
+    let key = event.key.toLowerCase();
+    if ( key == "e" && !pong_game.opponnent_is_ai )
         pong_game.left_paddle_up = false;
-    else if ( event.key == "d" )
+    else if ( key == "d" && !pong_game.opponnent_is_ai )
         pong_game.left_paddle_down = false;
     else if ( event.key == "ArrowUp" )
         pong_game.right_paddle_up = false;

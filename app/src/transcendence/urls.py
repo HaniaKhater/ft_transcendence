@@ -20,4 +20,6 @@ urlpatterns = [
     path( "leaderboard/", views.leaderboard, name="leaderboard" ),
     path( "user/<int:id>/", views.user_details, name="user-details" ),
     path( "following/", views.following, name="following" ),
+    path( "online-game/", views.online_game, name="online-game" ),
+    path( "online-tournament/", views.online_tournament, name="online-tournament" ),
 ]
